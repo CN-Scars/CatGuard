@@ -1,0 +1,157 @@
+name: Release
+
+# 推送 v* tag 自动构建 3 个架构的无签名 .dmg 并发布 GitHub Release。
+# 也支持 workflow_dispatch 手动触发（便于测试，需填 tag）。
+# 本工作流与 ci.yml 互不影响：ci.yml 仍是 push/PR 的 lint+build+test 闸门。
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to build (e.g. v0.2.0), for manual test runs"
+        required: true
+
+# 创建 Release 需要写权限。
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build · Package · Release
+    # CatGuard 依赖 AppKit / CoreGraphics / LocalAuthentication，必须 macOS runner。
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        # tag 为单一真实来源：push 取 github.ref_name，dispatch 取 inputs.tag。
+        # VERSION 去掉前缀 v（v0.2.0 -> 0.2.0），构建时注入。
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          VERSION="${TAG#v}"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Resolved TAG=$TAG VERSION=$VERSION"
+
+      - name: Select Xcode
+        # 选用 runner 上可用的最新 Xcode。KeyboardShortcuts 2.4.0 要求 Swift tools >= 6.1，
+        # 默认 Xcode 16.0（Swift 6.0）无法解析该依赖，故选最高版本。与 ci.yml 一致。
+        run: |
+          LATEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Selecting $LATEST"
+          sudo xcode-select -switch "$LATEST/Contents/Developer"
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install tooling
+        run: |
+          brew install xcodegen create-dmg
+
+      - name: Generate Xcode project
+        # project.yml 是唯一真实来源；.xcodeproj 不入库，现场生成。
+        run: xcodegen generate
+
+      - name: Build · package 3 architecture variants
+        # 三个变体：arm64 / x86_64 / universal。Release 配置、无签名、注入版本号。
+        # 每个变体构建前 clean build 目录避免架构混入。
+        # create-dmg 在 headless 下可能退出码非零（无法设置 Finder 属性 / 卷忙），
+        # 故用 || true 容错并断言 .dmg 文件存在；同时清理可能残留的 rw.*.dmg 临时文件。
+        run: |
+          set -euo pipefail
+          APP="build/Build/Products/Release/CatGuard.app"
+
+          build_variant() {
+            local archs="$1"
+            local arch_tag="$2"
+            local dmg="CatGuard_${VERSION}_${arch_tag}.dmg"
+
+            echo "::group::Build $arch_tag ($archs)"
+            rm -rf build
+            xcodebuild \
+              -project CatGuard.xcodeproj \
+              -scheme CatGuard \
+              -configuration Release \
+              -destination 'generic/platform=macOS' \
+              ARCHS="$archs" \
+              ONLY_ACTIVE_ARCH=NO \
+              MARKETING_VERSION="$VERSION" \
+              CURRENT_PROJECT_VERSION="$VERSION" \
+              CODE_SIGN_IDENTITY="-" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO \
+              -derivedDataPath build \
+              clean build
+            echo "::endgroup::"
+
+            test -d "$APP" || { echo "❌ $APP not found after build"; exit 1; }
+            echo "lipo for $arch_tag:"
+            lipo -info "$APP/Contents/MacOS/CatGuard"
+
+            echo "::group::Package $dmg"
+            # 清掉上一次可能残留的临时镜像，否则 create-dmg 会失败。
+            rm -f rw.*.dmg "$dmg"
+            create-dmg \
+              --volname "CatGuard" \
+              --window-size 540 380 \
+              --icon-size 100 \
+              --icon "CatGuard.app" 150 180 \
+              --app-drop-link 390 180 \
+              --no-internet-enable \
+              "$dmg" \
+              "$APP" || echo "⚠️ create-dmg exit $? (tolerated, verifying file)"
+            rm -f rw.*.dmg
+            echo "::endgroup::"
+
+            test -f "$dmg" || { echo "❌ $dmg was not produced"; exit 1; }
+            echo "✅ produced $dmg"
+            ls -lh "$dmg"
+          }
+
+          build_variant "arm64"          "aarch64"
+          build_variant "x86_64"         "x64"
+          build_variant "arm64 x86_64"   "universal"
+
+      - name: Generate release notes
+        # 用仓库内模板替换 {{VERSION}} 与三个下载 URL（GitHub Release 资产 URL 可预测）。
+        # 变更日志条目（✨/🐞/🔧）留给开发者在 Release 页手动编辑。
+        run: |
+          set -euo pipefail
+          BASE="https://github.com/${{ github.repository }}/releases/download/${TAG}"
+          URL_ARM="${BASE}/CatGuard_${VERSION}_aarch64.dmg"
+          URL_X64="${BASE}/CatGuard_${VERSION}_x64.dmg"
+          URL_UNIVERSAL="${BASE}/CatGuard_${VERSION}_universal.dmg"
+
+          sed \
+            -e "s|{{VERSION}}|${VERSION}|g" \
+            -e "s|{{URL_ARM}}|${URL_ARM}|g" \
+            -e "s|{{URL_X64}}|${URL_X64}|g" \
+            -e "s|{{URL_UNIVERSAL}}|${URL_UNIVERSAL}|g" \
+            .github/release-template.md > release-notes.md
+
+          echo "::group::release-notes.md"
+          cat release-notes.md
+          echo "::endgroup::"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: CatGuard ${{ env.VERSION }}
+          body_path: release-notes.md
+          files: |
+            CatGuard_${{ env.VERSION }}_aarch64.dmg
+            CatGuard_${{ env.VERSION }}_x64.dmg
+            CatGuard_${{ env.VERSION }}_universal.dmg
+          draft: false
+          prerelease: false
