@@ -38,6 +38,19 @@ struct MenuBarView: View {
             }
         }
 
+        // SettingsLink 是 SwiftUI 原生打开设置窗口的方式（macOS 14+）。
+        // CatGuard 是 LSUIElement(menu-bar)应用，默认不被激活，须先 activate
+        // 再打开，否则设置窗口可能出现在后台不获焦。simultaneousGesture 保证
+        // 在 SettingsLink 触发打开动作的同时执行激活。
+        SettingsLink {
+            Text("Settings…")
+        }
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                NSApp.activate(ignoringOtherApps: true)
+            }
+        )
+
         Divider()
 
         Button("Quit CatGuard") {

@@ -20,6 +20,11 @@ struct CatGuardApp: App {
             Text(controller.lockManager.isLocked ? "🐈🔒" : "🐈")
         }
         .menuBarExtraStyle(.menu)
+
+        // 标准设置窗口：承载快捷键 Recorder（需键盘焦点，不能塞进 NSMenu）。
+        Settings {
+            SettingsView()
+        }
     }
 }
 
@@ -36,6 +41,12 @@ final class AppController: ObservableObject {
     let floatingController: FloatingWindowController
     let eventTapManager: EventTapManager
     let remoteWatcher: RemoteUnlockWatcher
+
+    /// 全局上锁快捷键。lazy 因其回调捕获 self，须在所有属性初始化后再构造。
+    private lazy var hotKeyManager = HotKeyManager { [weak self] in
+        // 复用菜单 Lock 的同一路径：内含未授权时的权限引导。
+        self?.requestLock()
+    }
 
     /// EventTap / Watcher 是否已启动，避免权限授予回调重复启动。
     private var servicesStarted = false
@@ -58,6 +69,10 @@ final class AppController: ObservableObject {
         permission.onGranted = { [weak self] in
             self?.startServices()
         }
+
+        // 注册全局上锁快捷键。底层 Carbon RegisterEventHotKey 独立于 Accessibility
+        // 权限，即使未授权也能触发回调（回调内 requestLock 会做权限引导）。
+        hotKeyManager.start()
 
         // 启动时检查权限。注意：绝不能在此同步弹出 NSAlert.runModal()，
         // 因为 AppController 由 @StateObject 在 SwiftUI 首次评估场景图的事务中

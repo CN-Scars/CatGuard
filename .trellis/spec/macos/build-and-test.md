@@ -18,6 +18,30 @@ xcodegen generate   # required after cloning, and after any project.yml change
 
 ---
 
+## Convention: pin SPM dependencies with `exactVersion`
+
+**Why**: Because neither `.xcodeproj` nor `Package.resolved` is committed (everything is
+regenerated from `project.yml`), a `from:`/`upToNextMajor:` range lets CI resolve a
+*newer* version than the one tested locally — non-reproducible builds. Pin the exact
+tested version instead:
+
+```yaml
+packages:
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    exactVersion: 2.4.0   # not `from:` — no committed Package.resolved to lock it otherwise
+```
+
+Bump the version deliberately by editing this line. SPM dependencies resolve fine in CI's
+unsigned build (no signing needed to fetch packages).
+
+> **Gotcha**: a library's API may differ from docs/memory. KeyboardShortcuts 2.4.0 uses
+> `Name(_:default:)` (not `initial:`) and `Shortcut(_:modifiers:)` takes
+> `NSEvent.ModifierFlags` (so `import AppKit` is required). Verify against the resolved
+> checkout under `DerivedData/.../SourcePackages/checkouts/`, not from memory.
+
+---
+
 ## Pattern: standalone logic tests (no TEST_HOST)
 
 **Problem**: hosting a test bundle in the hardened-runtime, custom-signed app makes
