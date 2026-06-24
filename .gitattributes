@@ -1,0 +1,11 @@
+# GitHub Linguist：把工具/脚手架目录排除出语言统计。
+# 这些目录是 Trellis 及各 AI 工具的配置与脚本，不属于本项目源码（Swift）。
+# linguist-vendored 会让 Linguist 既不统计语言比例，也不在 diff 中高亮。
+
+.trellis/**      linguist-vendored
+.agents/**       linguist-vendored
+.codex/**        linguist-vendored
+.claude/**       linguist-vendored
+
+# 生成/锁定类文件（如未来出现）一并排除
+*.pbxproj        linguist-generated
