@@ -27,6 +27,7 @@ xcuserdata/
 # ── XcodeGen 生成的工程 ──────────────────────────────────
 # project.yml 是唯一真实来源；.xcodeproj 由 `xcodegen generate` 重新生成，
 # 不纳入版本控制以避免无意义 diff。克隆后运行 `xcodegen generate` 即可。
+# 此目录规则一并覆盖了内部的 project.pbxproj，故无需单独写 *.pbxproj。
 CatGuard.xcodeproj/
 
 # ── Swift Package Manager（如未来引入）─────────────────────
