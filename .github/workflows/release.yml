@@ -123,8 +123,9 @@ jobs:
           build_variant "arm64 x86_64"   "universal"
 
       - name: Generate release notes
-        # 用仓库内模板替换 {{VERSION}} 与三个下载 URL（GitHub Release 资产 URL 可预测）。
-        # 变更日志条目（✨/🐞/🔧）留给开发者在 Release 页手动编辑。
+        # 用仓库内模板替换 {{CHANGELOG}}、{{VERSION}} 与三个下载 URL（GitHub Release 资产 URL 可预测）。
+        # 变更日志从 CHANGELOG.md 自动提取当前版本段落（## [VERSION] 到下一个 ## 之前）。
+        # 提取不到则填默认占位文案，发布不中断。
         run: |
           set -euo pipefail
           BASE="https://github.com/${{ github.repository }}/releases/download/${TAG}"
@@ -132,12 +133,48 @@ jobs:
           URL_X64="${BASE}/CatGuard_${VERSION}_x64.dmg"
           URL_UNIVERSAL="${BASE}/CatGuard_${VERSION}_universal.dmg"
 
+          # 提取 CHANGELOG.md 中 ## [VERSION] 段落（VERSION 已去 v 前缀，允许尾随 - 日期），
+          # 到下一个 ## 之前的内容，写入临时文件。
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$VERSION" '
+              $0 ~ "^## \\[" ver "\\]" { capture=1; next }
+              capture && /^## / { exit }
+              capture { print }
+            ' CHANGELOG.md > changelog_block.txt
+          else
+            : > changelog_block.txt
+          fi
+
+          # 去除首尾空行（纯 awk，避免依赖 macOS runner 上不存在的 tac）。
+          # 中间空行保留：遇首个非空行后开始输出，尾部空行先缓存、遇下一个非空行再补回。
+          awk '
+            /[^[:space:]]/ { started=1 }
+            started {
+              if ($0 ~ /[^[:space:]]/) { for (i = 0; i < pending; i++) print ""; pending = 0; print }
+              else { pending++ }
+            }
+          ' changelog_block.txt > changelog_block.trim.txt
+          mv changelog_block.trim.txt changelog_block.txt
+
+          # fallback：提取为空时写默认占位文案，workflow 不失败。
+          if [ ! -s changelog_block.txt ]; then
+            printf '%s\n' "本次更新包含若干改进与修复。详细变更请见提交历史。" > changelog_block.txt
+            echo "::warning::No CHANGELOG.md entry for ${VERSION}, using fallback text"
+          fi
+
+          # 用 file-based awk splice 把 changelog 注入模板的 {{CHANGELOG}} 行
+          # （避免 sed / awk -v 在多行与特殊字符上的转义问题）。
+          awk 'FNR==NR{buf=buf $0 ORS; next} /{{CHANGELOG}}/{printf "%s", buf; next} {print}' \
+            changelog_block.txt .github/release-template.md > release-notes.step1.md
+
+          # 再跑原有的 VERSION / URL 替换。
           sed \
             -e "s|{{VERSION}}|${VERSION}|g" \
             -e "s|{{URL_ARM}}|${URL_ARM}|g" \
             -e "s|{{URL_X64}}|${URL_X64}|g" \
             -e "s|{{URL_UNIVERSAL}}|${URL_UNIVERSAL}|g" \
-            .github/release-template.md > release-notes.md
+            release-notes.step1.md > release-notes.md
+          rm -f release-notes.step1.md changelog_block.txt
 
           echo "::group::release-notes.md"
           cat release-notes.md
