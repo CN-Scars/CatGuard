@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+# 同一分支/PR 的并发运行只保留最新一次，节省 macOS runner 额度。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-build-test:
+    name: Lint · Build · Test
+    # CatGuard 依赖 AppKit / CoreGraphics / LocalAuthentication，必须 macOS runner。
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        # 固定到稳定的 Xcode 版本，避免镜像默认版本漂移导致构建不可复现。
+        run: sudo xcode-select -switch /Applications/Xcode_16.app/Contents/Developer
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        # project.yml 是唯一真实来源；.xcodeproj 不入库，CI 现场生成。
+        run: xcodegen generate
+
+      - name: Format check (swift-format lint)
+        # 任一格式问题都会以非零码失败，阻断合并。
+        run: |
+          xcrun swift-format lint \
+            --strict --recursive \
+            --configuration .swift-format \
+            CatGuard CatGuardTests
+
+      - name: Build
+        # CI 用 ad-hoc 签名即可（不依赖本地 "CatGuard Local Dev" 证书），
+        # 仅验证可编译；CODE_SIGNING_ALLOWED=NO 跳过签名步骤。
+        run: |
+          xcodebuild \
+            -project CatGuard.xcodeproj \
+            -scheme CatGuard \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Test
+        run: |
+          xcodebuild \
+            -project CatGuard.xcodeproj \
+            -scheme CatGuard \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            test

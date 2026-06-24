@@ -1,0 +1,51 @@
+# ── macOS ──────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# ── Xcode 构建产物 ────────────────────────────────────────
+build/
+DerivedData/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+*.xccheckout
+*.xcscmblueprint
+
+# ── Xcode 用户级状态 ──────────────────────────────────────
+xcuserdata/
+*.xcuserstate
+
+# ── XcodeGen 生成的工程 ──────────────────────────────────
+# project.yml 是唯一真实来源；.xcodeproj 由 `xcodegen generate` 重新生成，
+# 不纳入版本控制以避免无意义 diff。克隆后运行 `xcodegen generate` 即可。
+CatGuard.xcodeproj/
+
+# ── Swift Package Manager（如未来引入）─────────────────────
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# ── CatGuard 运行时产物 ──────────────────────────────────
+# 远程解锁信号文件不应出现在仓库中（一般在 $HOME，此处仅作防御）
+.catguard-unlock
+
+# ── 本地签名材料（绝不入库）──────────────────────────────
+*.p12
+*.pem
+*.cer
+
+# ── 编辑器 / 工具 ────────────────────────────────────────
+*.swp
+*~
+.idea/
+.vscode/
