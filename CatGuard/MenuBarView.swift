@@ -13,6 +13,7 @@ struct MenuBarView: View {
     /// 菜单需要据此刷新 Lock 按钮的禁用态。用普通 let 会导致状态变更不触发重绘。
     @ObservedObject var permissionManager: PermissionManager
     let onRequestLock: () -> Void
+    let onOpenSettings: () -> Void
 
     var body: some View {
         if !permissionManager.isTrusted {
@@ -36,6 +37,12 @@ struct MenuBarView: View {
             Button("Unlock with Touch ID") {
                 authManager.requestUnlock()
             }
+        }
+
+        // 打开设置窗口。由 SettingsWindowController 自管理 NSWindow，
+        // 不依赖 SettingsLink / 私有 selector（在 MenuBarExtra(.menu) 下均不可靠）。
+        Button("Settings…") {
+            onOpenSettings()
         }
 
         Divider()
