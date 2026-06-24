@@ -22,8 +22,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        # 固定到稳定的 Xcode 版本，避免镜像默认版本漂移导致构建不可复现。
-        run: sudo xcode-select -switch /Applications/Xcode_16.app/Contents/Developer
+        # 选用 runner 上可用的最新 Xcode。KeyboardShortcuts 2.4.0 要求 Swift tools >= 6.1，
+        # 而默认的 Xcode 16.0（Swift 6.0）无法解析该依赖，故选最高版本的 Xcode。
+        run: |
+          LATEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Selecting $LATEST"
+          sudo xcode-select -switch "$LATEST/Contents/Developer"
 
       - name: Show toolchain
         run: |
