@@ -86,12 +86,18 @@ lint → build → test。
 
 ### 发布
 
+**发版前**先在 [`CHANGELOG.md`](CHANGELOG.md) 顶部写好对应版本段落（如 `## [0.2.0] - 2026-06-24`，
+内部可自由分 ✨ 新功能 / 🐞 修复 / 🔧 改进 小节），再打 tag。
+
 推送 `v*` tag（如 `git tag v0.2.0 && git push origin v0.2.0`）会触发
 `.github/workflows/release.yml`：在 macOS runner 上以 Release 配置无签名构建
 arm64 / x86_64 / universal 三个变体，各打包成 .dmg，并自动创建同名 GitHub Release
 上传这 3 个资产。版本号以 tag 为准（注入 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`）。
 也可在 Actions 页用 **workflow_dispatch** 手动触发（填入 tag）做测试。
-变更日志（✨/🐞/🔧）在 Release 页手动补充。
+
+Release 说明的变更日志会**自动从 `CHANGELOG.md` 提取**：脚本按 tag（去 `v` 前缀）匹配
+`## [版本]` 段落，提取到下一个 `## ` 之前的内容填入。**若找不到对应段落**，则填默认占位
+文案（“本次更新包含若干改进与修复……”），发布不中断。下载链接由 workflow 动态生成，无需手填。
 
 ## 架构
 
