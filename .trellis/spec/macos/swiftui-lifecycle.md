@@ -97,3 +97,43 @@ struct MenuBarView: View {
     let authManager: AuthenticationManager                        // ok: no @Published drives UI
 }
 ```
+
+---
+
+## Don't: open Settings from a MenuBarExtra menu via `SettingsLink` or `showSettingsWindow:`
+
+**Symptom**: A "Settings…" item in a `MenuBarExtra(.menu)` does nothing when clicked.
+
+**Cause**: Two unreliable paths, both fail in a menu-bar (LSUIElement) app:
+- `SettingsLink` does not trigger inside the bridged `NSMenu` of `MenuBarExtra(.menu)`;
+  `.simultaneousGesture` on a menu item doesn't fire either.
+- The private selector `showSettingsWindow:` (and older `showPreferencesWindow:`) is
+  version-dependent and unreliable on macOS 15.
+
+**Fix**: Don't use SwiftUI's `Settings { }` scene for a menu-bar app. Self-manage an
+`NSWindow` hosting the SwiftUI settings view, and call it directly from the menu button:
+
+```swift
+@MainActor
+final class SettingsWindowController {
+    private var window: NSWindow?
+    func show() {
+        NSApp.activate(ignoringOtherApps: true)   // LSUIElement app must activate to focus
+        if let window { window.makeKeyAndOrderFront(nil); return }
+        let hosting = NSHostingController(rootView: SettingsView())
+        let win = NSWindow(contentViewController: hosting)
+        win.title = "CatGuard 设置"
+        win.styleMask = [.titled, .closable]
+        win.isReleasedWhenClosed = false   // allow reopening after close
+        win.center()
+        window = win
+        win.makeKeyAndOrderFront(nil)
+    }
+}
+
+// menu:
+Button("Settings…") { onOpenSettings() }   // → settingsWindowController.show()
+```
+
+**Why it works**: a self-managed `NSWindow` bypasses SwiftUI scene routing and all private
+selectors — behavior is fully under your control, no version-dependent APIs.

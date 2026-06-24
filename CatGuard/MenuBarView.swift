@@ -13,6 +13,7 @@ struct MenuBarView: View {
     /// 菜单需要据此刷新 Lock 按钮的禁用态。用普通 let 会导致状态变更不触发重绘。
     @ObservedObject var permissionManager: PermissionManager
     let onRequestLock: () -> Void
+    let onOpenSettings: () -> Void
 
     var body: some View {
         if !permissionManager.isTrusted {
@@ -38,18 +39,11 @@ struct MenuBarView: View {
             }
         }
 
-        // SettingsLink 是 SwiftUI 原生打开设置窗口的方式（macOS 14+）。
-        // CatGuard 是 LSUIElement(menu-bar)应用，默认不被激活，须先 activate
-        // 再打开，否则设置窗口可能出现在后台不获焦。simultaneousGesture 保证
-        // 在 SettingsLink 触发打开动作的同时执行激活。
-        SettingsLink {
-            Text("Settings…")
+        // 打开设置窗口。由 SettingsWindowController 自管理 NSWindow，
+        // 不依赖 SettingsLink / 私有 selector（在 MenuBarExtra(.menu) 下均不可靠）。
+        Button("Settings…") {
+            onOpenSettings()
         }
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                NSApp.activate(ignoringOtherApps: true)
-            }
-        )
 
         Divider()
 

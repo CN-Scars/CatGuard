@@ -12,7 +12,8 @@ struct CatGuardApp: App {
             MenuBarView(
                 authManager: controller.authManager,
                 permissionManager: controller.permissionManager,
-                onRequestLock: { controller.requestLock() }
+                onRequestLock: { controller.requestLock() },
+                onOpenSettings: { controller.settingsWindowController.show() }
             )
             .environmentObject(controller.lockManager)
         } label: {
@@ -21,10 +22,8 @@ struct CatGuardApp: App {
         }
         .menuBarExtraStyle(.menu)
 
-        // 标准设置窗口：承载快捷键 Recorder（需键盘焦点，不能塞进 NSMenu）。
-        Settings {
-            SettingsView()
-        }
+        // 不使用 SwiftUI Settings 场景：其唤起依赖 SettingsLink / 私有 selector，
+        // 在 MenuBarExtra(.menu) 下不可靠。改由 SettingsWindowController 自管理窗口。
     }
 }
 
@@ -41,6 +40,7 @@ final class AppController: ObservableObject {
     let floatingController: FloatingWindowController
     let eventTapManager: EventTapManager
     let remoteWatcher: RemoteUnlockWatcher
+    let settingsWindowController = SettingsWindowController()
 
     /// 全局上锁快捷键。lazy 因其回调捕获 self，须在所有属性初始化后再构造。
     private lazy var hotKeyManager = HotKeyManager { [weak self] in
