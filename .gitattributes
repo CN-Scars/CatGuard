@@ -6,6 +6,3 @@
 .agents/**       linguist-vendored
 .codex/**        linguist-vendored
 .claude/**       linguist-vendored
-
-# 生成/锁定类文件（如未来出现）一并排除
-*.pbxproj        linguist-generated
