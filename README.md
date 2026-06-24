@@ -15,6 +15,26 @@
 - 🔒 Fail-open：进程退出即恢复输入，绝不把自己锁死
 - 🛡️ 不联网、不记录按键、不读文件、不截屏
 
+## 下载安装
+
+到 [Releases 页](https://github.com/CN-Scars/CatGuard/releases) 下载对应芯片的 .dmg：
+
+| 芯片 | 文件 |
+|------|------|
+| Apple Silicon (M 系列) | `CatGuard_<版本>_aarch64.dmg` |
+| Intel | `CatGuard_<版本>_x64.dmg` |
+| 通用 (Universal) | `CatGuard_<版本>_universal.dmg` |
+
+安装步骤：
+
+1. 打开 .dmg，把 **CatGuard** 拖进「应用程序」
+2. **首次打开**：当前版本未做 Apple 签名/公证，会被 Gatekeeper 拦截。绕过方式（任选其一）：
+   - **右键** CatGuard.app → **打开** → 在弹窗中再点「打开」
+   - 或到「**系统设置 → 隐私与安全性**」，在被拦提示处点「**仍要打开**」
+   （Apple Silicon 上此提示尤为明显，属正常现象）
+3. 启动后到「**系统设置 → 隐私与安全性 → 辅助功能**」给 CatGuard 授予权限，
+   否则无法拦截输入
+
 ## 环境要求
 
 - macOS 15+
@@ -64,6 +84,15 @@ xcodebuild -scheme CatGuard -configuration Debug test
 CI（`.github/workflows/ci.yml`）在每次 push / PR 时于 macOS runner 上跑
 lint → build → test。
 
+### 发布
+
+推送 `v*` tag（如 `git tag v0.2.0 && git push origin v0.2.0`）会触发
+`.github/workflows/release.yml`：在 macOS runner 上以 Release 配置无签名构建
+arm64 / x86_64 / universal 三个变体，各打包成 .dmg，并自动创建同名 GitHub Release
+上传这 3 个资产。版本号以 tag 为准（注入 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`）。
+也可在 Actions 页用 **workflow_dispatch** 手动触发（填入 tag）做测试。
+变更日志（✨/🐞/🔧）在 Release 页手动补充。
+
 ## 架构
 
 | 模块 | 职责 |
@@ -80,4 +109,4 @@ lint → build → test。
 
 ## 状态
 
-v0.1 MVP。仅供个人本地使用，暂未签名公证。
+v0.1 MVP。Release 提供的 .dmg 暂未做 Apple 签名/公证，首次打开需按上文绕过 Gatekeeper。
