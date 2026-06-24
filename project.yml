@@ -5,6 +5,13 @@ options:
     macOS: "15.0"
   createIntermediateGroups: true
 
+packages:
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    # 锁定到已测版本：本仓库不提交 .xcodeproj / Package.resolved，CI 每次重新解析依赖，
+    # 用 exactVersion 保证 CI 与本地构建拉到同一版本，避免不可复现。升级时改这里。
+    exactVersion: 2.4.0
+
 settings:
   base:
     MARKETING_VERSION: "0.1.0"
@@ -27,6 +34,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.catguard.app
         PRODUCT_NAME: CatGuard
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_FILE: CatGuard/Info.plist
         CODE_SIGN_ENTITLEMENTS: CatGuard/CatGuard.entitlements
         ENABLE_HARDENED_RUNTIME: true
@@ -39,6 +47,7 @@ targets:
     dependencies:
       - sdk: IOKit.framework
       - sdk: LocalAuthentication.framework
+      - package: KeyboardShortcuts
 
   CatGuardTests:
     type: bundle.unit-test
