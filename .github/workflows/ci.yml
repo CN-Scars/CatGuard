@@ -11,6 +11,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # 锁定 XcodeGen 版本，保证 .xcodeproj 生成结果可复现（brew install 会装最新版，有漂移风险）。
+  XCODEGEN_VERSION: "2.45.4"
+
 jobs:
   lint-build-test:
     name: Lint · Build · Test
@@ -34,12 +38,19 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Install XcodeGen (pinned)
+        # 下载锁定版本的预编译二进制（而非 brew 最新版），保证生成结果可复现。
+        run: |
+          curl -fsSL -o /tmp/xcodegen.zip \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
+          unzip -oq /tmp/xcodegen.zip -d /tmp/xcodegen-dist
+          echo "/tmp/xcodegen-dist/xcodegen/bin" >> "$GITHUB_PATH"
 
       - name: Generate Xcode project
         # project.yml 是唯一真实来源；.xcodeproj 不入库，CI 现场生成。
-        run: xcodegen generate
+        run: |
+          xcodegen --version
+          xcodegen generate
 
       - name: Format check (swift-format lint)
         # 任一格式问题都会以非零码失败，阻断合并。

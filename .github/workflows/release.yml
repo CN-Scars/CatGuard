@@ -17,6 +17,10 @@ on:
 permissions:
   contents: write
 
+env:
+  # 锁定 XcodeGen 版本，保证 .xcodeproj 生成结果可复现（与 ci.yml 一致）。
+  XCODEGEN_VERSION: "2.45.4"
+
 jobs:
   release:
     name: Build · Package · Release
@@ -55,12 +59,19 @@ jobs:
           swift --version
 
       - name: Install tooling
+        # create-dmg 用 brew（不影响工程生成）；XcodeGen 用锁定版预编译二进制（保证可复现）。
         run: |
-          brew install xcodegen create-dmg
+          brew install create-dmg
+          curl -fsSL -o /tmp/xcodegen.zip \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
+          unzip -oq /tmp/xcodegen.zip -d /tmp/xcodegen-dist
+          echo "/tmp/xcodegen-dist/xcodegen/bin" >> "$GITHUB_PATH"
 
       - name: Generate Xcode project
         # project.yml 是唯一真实来源；.xcodeproj 不入库，现场生成。
-        run: xcodegen generate
+        run: |
+          xcodegen --version
+          xcodegen generate
 
       - name: Build · package 3 architecture variants
         # 三个变体：arm64 / x86_64 / universal。Release 配置、无签名、注入版本号。
