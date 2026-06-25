@@ -98,3 +98,31 @@ xcodebuild ... CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLO
 
 CI pipeline order: `xcodegen generate` → `swift-format lint --strict` → build → test.
 Triggers on push and PR to all branches. See `.github/workflows/ci.yml`.
+
+---
+
+## Gotcha: CJK punctuation glued to a `$var` crashes under `set -u`
+
+**Symptom**: a `bash set -euo pipefail` script aborts mid-run with
+`SOMEVAR<garbled>: unbound variable`, where the var name has stray bytes appended.
+
+**Cause**: in shell scripts with Chinese text (our install.sh has 中文 messages), a bare
+`$VAR` immediately followed by a multibyte CJK punctuation char (`「」（）…，。`) makes bash
+greedily fold the leading byte of that char into the variable name. With `set -u` an
+unknown name aborts the script. Example that bit us — `install.sh` had:
+
+```bash
+info "正在生成「$CERT_CN」…"     # ❌ $CERT_CN」 parsed as one (invalid) name
+info "移除 $dest…"               # ❌ $dest… likewise
+```
+
+**Fix**: always brace-bound variables adjacent to non-ASCII text:
+
+```bash
+info "正在生成「${CERT_CN}」…"    # ✅
+info "移除 ${dest}…"             # ✅
+```
+
+**Prevention**: scan with
+`grep -nP '\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]' script.sh` and run `shellcheck`. In any
+script mixing Chinese strings with variables, default to `${VAR}` everywhere.

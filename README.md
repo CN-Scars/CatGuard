@@ -17,6 +17,40 @@
 
 ## 下载安装
 
+提供两种方式。**若你关心"辅助功能授权能否稳定保持"，推荐方式二（脚本安装）。**
+
+### 方式二：脚本安装（推荐，授权稳定）
+
+> 一行命令：下载现成的 release dmg → 在你本机用稳定的自签名证书重签 App → 装到
+> 「应用程序」。**默认无需 sudo / 管理员密码**，仅用 macOS 系统自带工具（`codesign` /
+> `security` / `openssl` / `hdiutil` / `curl`），**不需要完整 Xcode**。
+
+```bash
+# 克隆仓库后本地运行（推荐）
+git clone https://github.com/CN-Scars/CatGuard.git
+cd CatGuard
+bash scripts/install.sh                 # 安装最新 release
+bash scripts/install.sh --version v0.2.0  # 安装指定版本
+bash scripts/install.sh --uninstall     # 卸载（移除 App，可选移除证书并重置授权）
+
+# 或直接 curl 运行（请在交互终端中执行）
+curl -fsSL https://raw.githubusercontent.com/CN-Scars/CatGuard/main/scripts/install.sh | bash
+```
+
+安装完成后，**直接打开即可**（脚本已自动移除隔离属性，无需右键绕过 Gatekeeper），
+然后到「**系统设置 → 隐私与安全性 → 辅助功能**」给 CatGuard 打开开关即可。
+
+> 说明：自签名 App 用 `spctl` 评估仍是 `rejected`（因为证书不被 Apple 根信任），但这
+> **不影响打开和使用**——脚本已清除 `com.apple.quarantine` 隔离属性，macOS 不会拦截；
+> 且辅助功能授权绑定的是签名哈希的稳定性，与 Gatekeeper 评估无关。
+
+**原理 / 为什么推荐**：macOS 把辅助功能（TCC）授权**绑定到代码签名哈希**。release 的
+dmg 是无签名（ad-hoc）的，没有稳定身份，导致授权"绑不住"——反复要求授权后仍无法
+拦截输入。脚本在你本机生成一个**稳定的自签名 code-signing 证书**（10 年有效，仅本机
+使用）并用它重签 App，签名哈希固定，**授权一次即长期保持，重装也不丢**。
+
+### 方式一：直接安装 dmg
+
 到 [Releases 页](https://github.com/CN-Scars/CatGuard/releases) 下载对应芯片的 .dmg：
 
 | 芯片 | 文件 |
@@ -34,6 +68,10 @@
    （Apple Silicon 上此提示尤为明显，属正常现象）
 3. 启动后到「**系统设置 → 隐私与安全性 → 辅助功能**」给 CatGuard 授予权限，
    否则无法拦截输入
+
+> ⚠️ **取舍**：方式一的 dmg 是无签名的，其辅助功能授权**可能不稳定**（系统更新、
+> 重装后可能需要重新授权，甚至授权后仍无法拦截）。若遇到"反复要求授权"的问题，
+> 请改用**方式二（脚本安装）**。
 
 ## 环境要求
 
