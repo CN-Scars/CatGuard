@@ -96,3 +96,41 @@ hardened-runtime, custom-signed app, and the Team IDs don't match.
 **Fix**: For **pure-logic tests**, do not host them in the app. Compile the tested source
 files directly into the test target (no `TEST_HOST`, no `@testable import`). See
 [build-and-test.md](./build-and-test.md).
+
+---
+
+## Distribution: unsigned dmg can't hold Accessibility authorization
+
+**Symptom**: A user installs the CI-built `.dmg`, grants Accessibility in System Settings,
+but the app still can't intercept input and keeps asking for authorization.
+
+**Cause**: The CI release build is `CODE_SIGNING_ALLOWED=NO` → `adhoc, linker-signed`
+(`flags=0x20002`). adhoc has no stable identity, so TCC authorization won't stick — same
+root cause as the rebuild gotcha above, but it bites *end users* of the dmg.
+
+**Why "let users compile" was rejected**: CommandLineTools has **no `xcodebuild`** (only
+full Xcode does, ~15GB+). Requiring users to install full Xcode to run a cat-guard utility
+is unreasonable.
+
+**Fix (shipped as `scripts/install.sh`)**: download the prebuilt dmg, then **re-sign it
+locally with a stable self-signed cert** — `codesign`/`security`/`openssl` are all
+system-provided, no Xcode needed:
+
+```bash
+# generate self-signed code-signing cert (codeSigning EKU), p12 with SHA1/3DES + password
+# import to login keychain, then trust:
+security add-trusted-cert -r trustRoot -p codeSign \
+  -k "$HOME/Library/Keychains/login.keychain-db" cert.pem      # login keychain, NO sudo
+# re-sign the downloaded app:
+codesign --force --deep --options runtime --sign "CatGuard Self-Signed" CatGuard.app
+codesign --verify --strict CatGuard.app                        # must pass
+```
+
+**Key facts (measured)**:
+- trust to **login keychain is enough and needs no sudo** — after trust, the cert appears
+  in `find-identity -p codesigning` and `codesign --sign` works.
+- Gatekeeper (`spctl`) still rejects a self-signed app (`origin=...Self-Signed`), but that
+  is **independent of TCC** — Accessibility authorization binds to the cdhash stability,
+  which the stable cert provides. So the app works after one authorization, survives reinstalls.
+- A self-signed cert **not** run through `add-trusted-cert` does NOT appear in
+  `find-identity -p codesigning` → `codesign --sign` can't find it. trust is mandatory.
