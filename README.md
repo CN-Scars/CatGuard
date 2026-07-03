@@ -17,9 +17,25 @@
 
 ## 下载安装
 
-提供两种方式。**若你关心"辅助功能授权能否稳定保持"，推荐方式二（脚本安装）。**
+提供三种方式。**方式一（Homebrew）与方式二（脚本）都会自动完成本机自签名重签，
+辅助功能授权稳定，推荐使用。**
 
-### 方式二：脚本安装（推荐，授权稳定）
+### 方式一：Homebrew（推荐）
+
+```bash
+brew tap cn-scars/catguard https://github.com/CN-Scars/CatGuard
+brew install --cask catguard
+```
+
+安装时 cask 的 postflight 会自动：清除隔离属性（无需右键绕过 Gatekeeper）+ 用本机
+自签名证书（`CatGuard Self-Signed`，与脚本安装共享同一张，幂等复用）重签 App。
+**装完直接打开即可**，然后到「**系统设置 → 隐私与安全性 → 辅助功能**」给 CatGuard
+打开开关。卸载：`brew uninstall --cask catguard`。
+
+> 注：本 tap 直接指向主仓库（cask 位于 `Casks/catguard.rb`），已实测该非 `homebrew-`
+> 前缀命名的显式 URL tap 可正常工作。
+
+### 方式二：脚本安装（授权稳定）
 
 > 一行命令：下载现成的 release dmg → 在你本机用稳定的自签名证书重签 App → 装到
 > 「应用程序」。**默认无需 sudo / 管理员密码**，仅用 macOS 系统自带工具（`codesign` /
@@ -44,12 +60,12 @@ curl -fsSL https://raw.githubusercontent.com/CN-Scars/CatGuard/main/scripts/inst
 > **不影响打开和使用**——脚本已清除 `com.apple.quarantine` 隔离属性，macOS 不会拦截；
 > 且辅助功能授权绑定的是签名哈希的稳定性，与 Gatekeeper 评估无关。
 
-**原理 / 为什么推荐**：macOS 把辅助功能（TCC）授权**绑定到代码签名哈希**。release 的
+**原理 / 为什么推荐重签**：macOS 把辅助功能（TCC）授权**绑定到代码签名哈希**。release 的
 dmg 是无签名（ad-hoc）的，没有稳定身份，导致授权"绑不住"——反复要求授权后仍无法
-拦截输入。脚本在你本机生成一个**稳定的自签名 code-signing 证书**（10 年有效，仅本机
-使用）并用它重签 App，签名哈希固定，**授权一次即长期保持，重装也不丢**。
+拦截输入。方式一 / 方式二都会在你本机生成一个**稳定的自签名 code-signing 证书**（10 年
+有效，仅本机使用）并用它重签 App，签名哈希固定，**授权一次即长期保持，重装也不丢**。
 
-### 方式一：直接安装 dmg
+### 方式三：直接安装 dmg
 
 到 [Releases 页](https://github.com/CN-Scars/CatGuard/releases) 下载对应芯片的 .dmg：
 
@@ -69,9 +85,9 @@ dmg 是无签名（ad-hoc）的，没有稳定身份，导致授权"绑不住"�
 3. 启动后到「**系统设置 → 隐私与安全性 → 辅助功能**」给 CatGuard 授予权限，
    否则无法拦截输入
 
-> ⚠️ **取舍**：方式一的 dmg 是无签名的，其辅助功能授权**可能不稳定**（系统更新、
+> ⚠️ **取舍**：方式三的 dmg 是无签名的，其辅助功能授权**可能不稳定**（系统更新、
 > 重装后可能需要重新授权，甚至授权后仍无法拦截）。若遇到"反复要求授权"的问题，
-> 请改用**方式二（脚本安装）**。
+> 请改用**方式一（Homebrew）或方式二（脚本安装）**。
 
 ## 环境要求
 
@@ -137,6 +153,10 @@ arm64 / x86_64 / universal 三个变体，各打包成 .dmg，并自动创建同
 Release 说明的变更日志会**自动从 `CHANGELOG.md` 提取**：脚本按 tag（去 `v` 前缀）匹配
 `## [版本]` 段落，提取到下一个 `## ` 之前的内容填入。**若找不到对应段落**，则填默认占位
 文案（“本次更新包含若干改进与修复……”），发布不中断。下载链接由 workflow 动态生成，无需手填。
+
+**发布后**需手动更新 Homebrew cask（[`Casks/catguard.rb`](Casks/catguard.rb)）的
+`version` 与 `sha256`（`shasum -a 256 CatGuard_<版本>_universal.dmg`），否则 brew
+用户装到的仍是旧版。
 
 ## 架构
 
